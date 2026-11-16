@@ -42,6 +42,27 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(var(--s
 .seg button.on.g{box-shadow:inset 0 -3px 0 var(--gel)}
 .seg button.on.c{box-shadow:inset 0 -3px 0 var(--cons)}
 .seg small{font-weight:500;opacity:.75;margin-left:4px}
+.chips{display:flex;gap:6px;overflow-x:auto;margin-top:8px;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;min-height:40px;padding:0 14px;border-radius:20px;background:var(--card);font-weight:600;font-size:15px;color:var(--dim);white-space:nowrap}
+.chips button.on{background:var(--card2);color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--cons)}
+.chips.g button.on{box-shadow:inset 0 0 0 1.5px var(--gel)}
+.chips small{opacity:.7;margin-left:5px;font-weight:500}
+.chips .add{color:var(--amber)}
+.chips.wrap{flex-wrap:wrap;overflow:visible;margin:0 0 12px}
+.chips.wrap button{background:var(--card2)}
+.chips.wrap button.on{background:var(--gel);color:#2a0013;box-shadow:none}
+.chips.wrap.c button.on{background:var(--cons);color:#00211d}
+.olh{padding:10px 12px 2px;font-size:13px;color:var(--dim);font-weight:650;border-top:1px solid var(--line)}
+.olh:first-child{border-top:0}
+.ol.sub{border-top:0}
+.newg{display:flex;gap:8px;margin:-4px 0 12px}
+.newg input{flex:1;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--bg);padding:0 12px;font-size:16px}
+.newg button{min-height:44px;padding:0 16px;border-radius:12px;background:var(--amber);color:var(--amberInk);font-weight:700}
+.gl{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.gl input{flex:1;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--bg);padding:0 12px;font-size:16px}
+.gl span{color:var(--dim);font-size:13px;min-width:54px;text-align:right}
+.gl button{width:44px;height:44px;border-radius:12px;background:var(--card2);color:var(--red);font-size:20px}
 .find{margin-top:8px;width:100%;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);padding:0 14px;font-size:16px}
 main{flex:1;padding:6px 16px calc(150px + var(--safeB))}
 .hint{color:var(--dim);font-size:13px;text-align:center;padding:4px 0 8px}
@@ -140,6 +161,7 @@ pre.msg{white-space:pre-wrap;background:var(--bg);border-radius:12px;padding:12p
       <button data-c="gel" class="g">Gels<small id="nG"></small></button>
       <button data-c="cons" class="c">Consumables<small id="nC"></small></button>
     </div>
+    <div class="chips" id="chips"></div>
     <input class="find" id="find" type="search" placeholder="Find" autocomplete="off">
   </header>
   <main id="main"></main>
@@ -154,7 +176,7 @@ pre.msg{white-space:pre-wrap;background:var(--bg);border-radius:12px;padding:12p
 <div id="toast"></div>
 <script>
 {
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const KEY = 'crewkit-consumables:v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -227,6 +249,60 @@ function guessCat(name) {
   if (GEL_WORDS.test(name)) return 'gel';
   return 'cons';
 }
+
+/* ---------- categories within each list ----------
+   Gels start as Diffusion / CTO / CTB / ND / ± Green / Specials; consumables start with none.
+   Categories are kept for every job. Anything swapped by hand is remembered by name
+   (S.learn), so the next sheet puts it in the right place straight away. */
+const DEFAULT_GROUPS = {gel: [{id: 'diff', name: 'Diffusion'}, {id: 'cto', name: 'CTO'}, {id: 'ctb', name: 'CTB'}, {id: 'nd', name: 'ND'}, {id: 'green', name: '± Green'}, {id: 'spec', name: 'Specials'}], cons: []};
+function ensureGroups() {
+  if (!S.groups) S.groups = JSON.parse(JSON.stringify(DEFAULT_GROUPS));
+  for (const c of ['gel', 'cons']) if (!Array.isArray(S.groups[c])) S.groups[c] = [];
+  if (!S.learn) S.learn = {};
+  for (const j of Object.values(S.jobs)) for (const it of j.items) if (it.grp === undefined) it.grp = autoGroup(it.name, it.cat);
+}
+function guessGroup(n) {
+  if (/\bn\.?\s?d\b|\bnd\s?\.?\d|neutral density/i.test(n)) return 'nd';
+  if (/(plus|minus|\+|−|-)\s*green|\b(pg|mg)\b/i.test(n)) return 'green';
+  if (/\bcto\b|\bct\s?o\b|\bcts\b|\bct straw\b/i.test(n)) return 'cto';
+  if (/\bctb\b|\bct\s?b\b/i.test(n)) return 'ctb';
+  if (/diff|frost|opal|silk|grid|spun|leelux|hampshire|hannover|\b(216|250|251|252|129|400|410|420|430|434|450|452|460|480)\b|\b(full|half|quarter|eighth|\d\/\d) white\b|white diff/i.test(n)) return 'diff';
+  return 'spec';
+}
+const groupsOf = cat => (S.groups && S.groups[cat]) || [];
+const groupName = (cat, id) => { const g = groupsOf(cat).find(x => x.id === id); return g ? g.name : 'Other'; };
+function grpOf(it) {
+  const gs = groupsOf(it.cat);
+  if (!gs.length) return null;
+  return it.grp && gs.some(g => g.id === it.grp) ? it.grp : 'other';
+}
+function autoGroup(name, cat) {
+  const gs = groupsOf(cat), has = id => gs.some(g => g.id === id);
+  const l = S.learn && S.learn[norm(name)];
+  if (l && l.cat === cat && l.grp && has(l.grp)) return l.grp;
+  if (cat === 'gel') { const g = guessGroup(name); if (has(g)) return g; }
+  return null;
+}
+function sections(items, cat) {
+  const gs = groupsOf(cat);
+  if (!gs.length) return [{g: null, items}];
+  const out = gs.map(g => ({g, items: items.filter(i => grpOf(i) === g.id)}));
+  out.push({g: {id: 'other', name: 'Other'}, items: items.filter(i => grpOf(i) === 'other')});
+  return out.filter(s => s.items.length);
+}
+function addGroup(cat, name) {
+  name = name.trim(); if (!name) return null;
+  const hit = groupsOf(cat).find(g => g.name.toLowerCase() === name.toLowerCase());
+  if (hit) return hit.id;
+  const id = 'g' + uid();
+  S.groups[cat].push({id, name}); logIt('category', `New ${cat} category: ${name}`); save();
+  return id;
+}
+function applyLearn(rows) {
+  for (const r of rows) { const l = S.learn[norm(r.name)]; if (l && l.cat && !r.flipped) r.cat = l.cat; }
+  return rows;
+}
+const listName = c => c === 'gel' ? 'Gels' : 'Consumables';
 
 /* ---------- reading a pasted list ---------- */
 const HEAD_GEL = /^(gels?|gel\s*(&|and)\s*diff(usion)?|diffusion|colou?rs?|filters?)\s*:?$/i;
@@ -399,12 +475,12 @@ function homeTip() {
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
 
 /* ---------- UI state ---------- */
-const ui = {tab: 'truck', cat: 'gel', q: '', undo: null};
+const ui = {tab: 'truck', cat: 'gel', grp: {gel: 'all', cons: 'all'}, q: '', undo: null};
 
 function render() {
   const j = job();
   $('#jobName').textContent = j ? j.name : 'Consumables';
-  if (!j) { $('#seg').hidden = true; $('#find').hidden = true; $('#fab').hidden = true; $('#main').innerHTML = homeTip() + welcome(); bindWelcome(); setNav(0); return; }
+  if (!j) { $('#chips').hidden = true; $('#seg').hidden = true; $('#find').hidden = true; $('#fab').hidden = true; $('#main').innerHTML = homeTip() + welcome(); bindWelcome(); setNav(0); return; }
   $('#seg').hidden = false; $('#fab').hidden = ui.tab !== 'truck';
   const st = stats(j), items = live(j);
   const gels = items.filter(i => i.cat === 'gel'), cons = items.filter(i => i.cat === 'cons');
@@ -417,8 +493,26 @@ function render() {
   $('#jobSub').textContent = items.length ? `${toOrd ? toOrd + ' to order' : 'Nothing to order'}${pend ? ' · ' + pend + ' on order' : ''}` : 'No list yet';
   setNav(toOrd);
   $('#seg').hidden = ui.tab !== 'truck'; $('#find').hidden = ui.tab !== 'truck' || items.length < 12;
+  renderChips(st, items);
   $('#main').innerHTML = homeTip() + (ui.tab === 'truck' ? truckView(j, st, items) : orderView(j, st, items));
 }
+function renderChips(st, items) {
+  const c = $('#chips');
+  c.hidden = ui.tab !== 'truck' || !items.length;
+  if (c.hidden) return;
+  const mine = items.filter(i => i.cat === ui.cat), secs = sections(mine, ui.cat);
+  const packs = arr => arr.reduce((a, i) => a + Math.max(0, st[i.id].truck), 0);
+  if (ui.grp[ui.cat] !== 'all' && !secs.some(s => s.g && s.g.id === ui.grp[ui.cat])) ui.grp[ui.cat] = 'all';
+  const cur = ui.grp[ui.cat];
+  c.className = 'chips' + (ui.cat === 'gel' ? ' g' : '');
+  c.innerHTML = (groupsOf(ui.cat).length ? `<button data-g="all" class="${cur === 'all' ? 'on' : ''}">All</button>` + secs.map(s => `<button data-g="${s.g.id}" class="${cur === s.g.id ? 'on' : ''}">${esc(s.g.name)}<small>${packs(s.items)}</small></button>`).join('') : '')
+    + `<button class="add" data-g="+">${groupsOf(ui.cat).length ? '+ / Edit' : '+ Add categories'}</button>`;
+}
+$('#chips').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.g === '+') { openGroups(ui.cat); return; }
+  ui.grp[ui.cat] = b.dataset.g; render(); scrollTo(0, 0);
+});
 function setNav(n) {
   $('#tTruck').classList.toggle('on', ui.tab === 'truck');
   $('#tOrder').classList.toggle('on', ui.tab === 'order');
@@ -436,9 +530,12 @@ function bindWelcome() {
 function truckView(j, st, items) {
   if (!items.length) return `<div class="empty"><b>No list yet</b>Load the Sunbelt sheet, or paste or type what was delivered. Gels and consumables get sorted for you.</div><button class="big" data-act="add">Add the delivery</button>`;
   const q = norm(ui.q);
-  const rows = items.filter(i => i.cat === ui.cat && (!q || norm(i.name).includes(q))); // sheet order, so it matches the paperwork
+  const g = ui.grp[ui.cat];
+  const rows = items.filter(i => i.cat === ui.cat && (!q || norm(i.name).includes(q)) && (g === 'all' || q || grpOf(i) === g)); // sheet order, so it matches the paperwork
   if (!rows.length) return `<div class="empty">${q ? 'Nothing matches.' : `No ${ui.cat === 'gel' ? 'gels' : 'consumables'} on this list.`}</div>`;
-  return `<div class="hint">Swipe right when a pack's used · tap the name to edit</div><div class="list">${rows.map(i => rowHtml(i, st[i.id])).join('')}</div>`;
+  const hint = `<div class="hint">Swipe right when a pack's used · tap the name to edit</div>`;
+  if (g !== 'all' || q || !groupsOf(ui.cat).length) return hint + `<div class="list">${rows.map(i => rowHtml(i, st[i.id])).join('')}</div>`;
+  return hint + sections(rows, ui.cat).map((s, k) => `<h2 style="${k ? '' : 'margin-top:4px'}">${esc(s.g.name)}</h2><div class="list">${s.items.map(i => rowHtml(i, st[i.id])).join('')}</div>`).join('');
 }
 function rowHtml(i, s) {
   const t = Math.max(0, s.truck), out = t === 0;
@@ -456,7 +553,9 @@ function orderView(j, st, items) {
   const to = items.filter(i => st[i.id].toOrder > 0), wait = items.filter(i => st[i.id].pending > 0);
   const group = (arr, fn) => ['gel', 'cons'].map(c => {
     const a = arr.filter(i => i.cat === c);
-    return a.length ? `<h2><i class="dot ${c === 'gel' ? 'g' : ''}"></i>${c === 'gel' ? 'Gels' : 'Consumables'}</h2><div class="card">${a.map(fn).join('')}</div>` : '';
+    if (!a.length) return '';
+    const secs = sections(a, c), heads = secs.length > 1 || (secs[0] && secs[0].g);
+    return `<h2><i class="dot ${c === 'gel' ? 'g' : ''}"></i>${listName(c)}</h2><div class="card">${secs.map(s => (heads && s.g ? `<div class="olh">${esc(s.g.name)}</div>` : '') + s.items.map(i => fn(i).replace('class="ol"', heads ? 'class="ol sub"' : 'class="ol"')).join('')).join('')}</div>`;
   }).join('');
   let h = '';
   if (!to.length && !wait.length) {
@@ -567,11 +666,14 @@ function openCount(it) {
 
 function openEdit(it) {
   const s = stats(job())[it.id];
-  let cat = it.cat, total = s.deliver;
+  let cat = it.cat, total = s.deliver, grp = grpOf(it) === 'other' ? null : grpOf(it), newOpen = false;
   sheet(`<h3>Edit</h3>
     <label class="fld"><span>Name</span><input id="eName" value="${esc(it.name)}" autocomplete="off"></label>
     <div class="fld"><span>Which list</span></div>
     <div class="two"><button data-c="gel" class="g">Gels</button><button data-c="cons" class="c">Consumables</button></div>
+    <div class="fld"><span id="eGl">Category</span></div>
+    <div class="chips wrap" id="eGrp"></div>
+    <div class="newg" id="eNew" hidden><input id="eNewG" placeholder="New category, e.g. Tape" autocomplete="off"><button id="eNewGo">Add</button></div>
     <div class="fld"><span>Total delivered</span></div>
     <div class="bigstep"><button id="eM" aria-label="One less">−</button><b id="eT">${total}</b><button id="eP" aria-label="One more">+</button></div>
     <p id="eInfo" style="text-align:center;margin-top:-6px"></p>
@@ -582,18 +684,36 @@ function openEdit(it) {
     </div>`, sh => {
     const paint = () => {
       sh.querySelectorAll('.two button').forEach(b => b.classList.toggle('on', b.dataset.c === cat));
+      const gs = groupsOf(cat);
+      $('#eGl').textContent = listName(cat) + ' category';
+      $('#eGrp').className = 'chips wrap' + (cat === 'gel' ? '' : ' c');
+      $('#eGrp').innerHTML = gs.map(g => `<button data-g="${g.id}" class="${grp === g.id ? 'on' : ''}">${esc(g.name)}</button>`).join('') + `<button class="add" data-g="+">+ New</button>`;
+      $('#eNew').hidden = !newOpen;
       $('#eT').textContent = total;
       $('#eInfo').textContent = `${Math.max(0, s.truck + total - s.deliver)} on the truck` + (s.use ? ` · ${s.use} used` : '') + (s.arrive ? ` · ${s.arrive} restocked` : '');
     };
     paint();
-    sh.querySelectorAll('.two button').forEach(b => b.onclick = () => { cat = b.dataset.c; paint(); });
+    sh.querySelectorAll('.two button').forEach(b => b.onclick = () => { if (cat !== b.dataset.c) { cat = b.dataset.c; grp = autoGroup(it.name, cat); } paint(); });
+    $('#eGrp').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.g === '+') { newOpen = !newOpen; paint(); if (newOpen) $('#eNewG').focus(); return; }
+      grp = grp === b.dataset.g ? null : b.dataset.g; paint();
+    });
+    const addNew = () => { const id = addGroup(cat, $('#eNewG').value); if (id) { grp = id; newOpen = false; $('#eNewG').value = ''; paint(); } };
+    $('#eNewGo').onclick = addNew; $('#eNewG').onkeydown = e => { if (e.key === 'Enter') addNew(); };
     $('#eM').onclick = () => { if (total > 0 && s.truck + total - 1 - s.deliver >= 0) { total--; paint(); } };
     $('#eP').onclick = () => { total++; paint(); };
     $('#eDone').onclick = () => {
       const nm = $('#eName').value.trim();
       const msgs = [];
-      if (nm && nm !== it.name) { addEv('rename', it.id, 0, {from: it.name, to: nm}); logIt('rename', `"${it.name}" → "${nm}"`); it.name = nm; msgs.push('Renamed'); }
-      if (cat !== it.cat) { addEv('move', it.id, 0, {from: it.cat, to: cat}); logIt('move', `${it.name}: ${it.cat} → ${cat}`); it.cat = cat; ui.cat = cat; msgs.push('Moved to ' + (cat === 'gel' ? 'Gels' : 'Consumables')); }
+      if (nm && nm !== it.name) { addEv('rename', it.id, 0, {from: it.name, to: nm}); logIt('rename', `"${it.name}" → "${nm}"`); if (S.learn[norm(it.name)]) S.learn[norm(nm)] = S.learn[norm(it.name)]; it.name = nm; msgs.push('Renamed'); }
+      const oldGrp = grpOf(it) === 'other' ? null : grpOf(it), moved = cat !== it.cat;
+      if (moved) { addEv('move', it.id, 0, {from: it.cat, to: cat}); logIt('move', `${it.name}: ${it.cat} → ${cat}`); it.cat = cat; ui.cat = cat; msgs.push('Moved to ' + listName(cat)); }
+      if (moved || grp !== oldGrp) {
+        if (grp !== oldGrp) { addEv('group', it.id, 0, {from: oldGrp ? groupName(cat, oldGrp) : 'none', to: grp ? groupName(cat, grp) : 'none'}); logIt('group', `${it.name}: ${oldGrp ? groupName(cat, oldGrp) : 'none'} → ${grp ? groupName(cat, grp) : 'none'} (guess was ${cat === 'gel' ? groupName('gel', guessGroup(it.name)) : 'none'})`); if (!moved) msgs.push('Moved to ' + (grp ? groupName(cat, grp) : 'no category')); }
+        it.grp = grp; S.learn[norm(it.name)] = {cat, grp};
+        if (ui.grp[cat] !== 'all' && grp) ui.grp[cat] = grp;
+      }
       const diff = total - s.deliver;
       if (diff) { addEv('fix', it.id, diff); logIt('fix', `${it.name}: delivered ${s.deliver} → ${total}`); msgs.push('Total changed'); }
       save(); closeSheet(); render(); if (msgs.length) toast(msgs.join(' · '));
@@ -618,7 +738,7 @@ function openAdd() {
       $('#aGo').disabled = !rows.length;
       $('#aGo').textContent = rows.length ? `Add ${rows.length} item${rows.length > 1 ? 's' : ''}` : 'Add';
     };
-    $('#aTxt').oninput = () => { rows = mergeRows(fromFile.concat(parseList($('#aTxt').value))); paint(); };
+    $('#aTxt').oninput = () => { rows = applyLearn(mergeRows(fromFile.concat(parseList($('#aTxt').value)))); paint(); };
     $('#aFile').onchange = async e => {
       const f = e.target.files && e.target.files[0]; if (!f) return;
       $('#aMsg').textContent = 'Reading ' + f.name + '…';
@@ -632,7 +752,7 @@ function openAdd() {
           const g = res.rows.filter(r => r.cat === 'gel').length;
           logIt('import', `${f.name}: ${g} gels, ${res.rows.length - g} consumables`);
           fromFile = res.rows;
-          rows = mergeRows(fromFile.concat(parseList($('#aTxt').value)));
+          rows = applyLearn(mergeRows(fromFile.concat(parseList($('#aTxt').value))));
           $('#aMsg').textContent = `From ${f.name}: ${g} gels and ${res.rows.length - g} consumables. Check the numbers, then Add.`;
           paint();
         }
@@ -655,7 +775,7 @@ function openAdd() {
         const nm = r.name.trim(); if (!nm || r.qty <= 0) continue;
         let it = live(j).find(i => norm(i.name) === norm(nm));
         if (it) topped++;
-        else { it = {id: uid(), name: nm, cat: r.cat}; j.items.push(it); added++; if (r.flipped) logIt('guess', `"${nm}" guessed ${guessCat(nm)}, set to ${r.cat}`); }
+        else { it = {id: uid(), name: nm, cat: r.cat, grp: autoGroup(nm, r.cat)}; j.items.push(it); added++; if (r.flipped) logIt('guess', `"${nm}" guessed ${guessCat(nm)}, set to ${r.cat}`); }
         addEv('deliver', it.id, r.qty);
       }
       logIt('add', `Added ${added} new, topped up ${topped} (${rows.length} lines pasted)`);
@@ -680,7 +800,11 @@ function orderText(j, st, items) {
     const a = items.filter(i => i.cat === c && st[i.id].toOrder > 0);
     if (!a.length) continue;
     lines.push('', c === 'gel' ? 'GELS' : 'CONSUMABLES');
-    for (const i of a) lines.push(`${st[i.id].toOrder} × ${i.name}`);
+    const secs = sections(a, c);
+    for (const s of secs) {
+      if (s.g && secs.length > 1) lines.push(s.g.name + ':');
+      for (const i of s.items) lines.push(`${st[i.id].toOrder} × ${i.name}`);
+    }
   }
   if (S.driver) lines.push('', 'From ' + S.driver);
   return lines.join('\n');
@@ -750,6 +874,38 @@ function allArrived() {
   });
 }
 
+/* ---------- manage categories ---------- */
+function openGroups(cat) {
+  const j = job(), items = j ? live(j).filter(i => i.cat === cat) : [];
+  sheet(`<h3>${listName(cat)} categories</h3><p>Rename by typing. Items in a deleted category go to Other. Swap an item's category by tapping its name.</p>
+    <div id="gList"></div>
+    <div class="newg" style="margin:4px 0 14px"><input id="gNew" placeholder="Add a category" autocomplete="off"><button id="gAdd">Add</button></div>
+    <div class="stack">${cat === 'gel' ? '<button class="big sec" id="gReset">Put back the standard gel categories</button>' : ''}<button class="big" id="gDone">Done</button></div>`, () => {
+    const paint = () => {
+      $('#gList').innerHTML = groupsOf(cat).map(g => `<div class="gl" data-id="${g.id}"><input value="${esc(g.name)}" aria-label="Category name"><span>${items.filter(i => grpOf(i) === g.id).length} items</span><button aria-label="Delete ${esc(g.name)}">×</button></div>`).join('') || '<p>No categories yet.</p>';
+    };
+    paint();
+    $('#gList').addEventListener('change', e => {
+      const row = e.target.closest('.gl'); if (!row) return;
+      const g = groupsOf(cat).find(x => x.id === row.dataset.id), v = e.target.value.trim();
+      if (g && v && v !== g.name) { logIt('category', `Renamed ${g.name} → ${v}`); g.name = v; save(); render(); }
+    });
+    $('#gList').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      const id = b.closest('.gl').dataset.id, g = groupsOf(cat).find(x => x.id === id);
+      S.groups[cat] = groupsOf(cat).filter(x => x.id !== id); logIt('category', 'Deleted ' + g.name); save(); paint(); render();
+      toast('Deleted ' + g.name, () => { S.groups[cat].push(g); logIt('undo', 'delete category ' + g.name); save(); render(); openGroups(cat); });
+    });
+    const add = () => { if (addGroup(cat, $('#gNew').value)) { $('#gNew').value = ''; paint(); render(); } };
+    $('#gAdd').onclick = add; $('#gNew').onkeydown = e => { if (e.key === 'Enter') add(); };
+    const rs = $('#gReset'); if (rs) rs.onclick = () => {
+      for (const d of DEFAULT_GROUPS.gel) if (!S.groups.gel.some(g => g.id === d.id)) S.groups.gel.push(Object.assign({}, d));
+      logIt('category', 'Standard gel categories put back'); save(); paint(); render();
+    };
+    $('#gDone').onclick = closeSheet;
+  });
+}
+
 /* ---------- jobs + menu ---------- */
 function openNewJob() {
   sheet(`<h3>New job</h3><label class="fld"><span>Job name</span><input id="nName" placeholder="e.g. American Heiress" autocomplete="off"></label><div class="stack"><button class="big" id="nGo">Start</button><button class="big sec" id="nX">Cancel</button></div>`, () => {
@@ -799,10 +955,11 @@ function diagText(note) {
   if (j) {
     const st = stats(j);
     L.push('JOB: ' + j.name + ` (${live(j).length} items)`, 'list | name | delivered | truck | used | to order | on order');
-    for (const i of live(j)) { const s = st[i.id]; L.push(`${i.cat} | ${i.name} | ${s.deliver} | ${s.truck} | ${s.use} | ${s.toOrder} | ${s.pending}`); }
-    const ch = j.ev.filter(e => e.type === 'rename' || e.type === 'move');
-    if (ch.length) { L.push('', 'NAME AND LIST CHANGES:'); for (const e of ch) { const it = j.items.find(x => x.id === e.item); L.push(e.type === 'rename' ? `rename "${e.from}" -> "${e.to}"` : `move "${it ? it.name : '?'}" ${e.from} -> ${e.to}`); } }
+    for (const i of live(j)) { const s = st[i.id]; L.push(`${i.cat}${grpOf(i) ? '/' + groupName(i.cat, grpOf(i)) : ''} | ${i.name} | ${s.deliver} | ${s.truck} | ${s.use} | ${s.toOrder} | ${s.pending}`); }
+    const ch = j.ev.filter(e => e.type === 'rename' || e.type === 'move' || e.type === 'group');
+    if (ch.length) { L.push('', 'NAME AND LIST CHANGES:'); for (const e of ch) { const it = j.items.find(x => x.id === e.item); L.push(e.type === 'rename' ? `rename "${e.from}" -> "${e.to}"` : `${e.type} "${it ? it.name : '?'}" ${e.from} -> ${e.to}`); } }
   }
+  L.push('', 'CATEGORIES: gels ' + groupsOf('gel').map(g => g.name).join(', ') + ' · consumables ' + (groupsOf('cons').map(g => g.name).join(', ') || 'none'));
   L.push('', 'LOG (newest last):');
   for (const [t, k, m] of S.log.slice(-300)) L.push(`${t.slice(5, 19).replace('T', ' ')} ${k}: ${m}`);
   if (j) L.push('', '---DATA---', JSON.stringify({v: VERSION, job: j}));
@@ -849,6 +1006,7 @@ $('#fab').onclick = openAdd;
 $('#menuBtn').onclick = openMenu;
 $('#jobBtn').onclick = () => job() ? openJobs() : openNewJob();
 
+ensureGroups();
 logIt('open', 'v' + VERSION);
 save(); render();
 if (location.protocol === 'https:' && window.top === window && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
