@@ -67,8 +67,9 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(var(--s
 main{flex:1;padding:6px 16px calc(150px + var(--safeB))}
 .hint{color:var(--dim);font-size:13px;text-align:center;padding:4px 0 8px}
 .list{display:flex;flex-direction:column;gap:8px}
-.row{position:relative;border-radius:16px;overflow:hidden;background:var(--green);touch-action:pan-y}
-.row .under{position:absolute;inset:0;display:flex;align-items:center;padding-left:20px;font-weight:700;color:#06210f}
+.row{position:relative;border-radius:16px;overflow:hidden;background:var(--card);touch-action:pan-y}
+.row.drag,.row.snap{background:var(--green)}
+.row .under{position:absolute;inset:0;visibility:hidden;display:flex;align-items:center;padding-left:20px;font-weight:700;color:#06210f}
 .row .face{position:relative;display:flex;align-items:center;gap:10px;background:var(--card);min-height:68px;padding:8px 8px 8px 14px;transition:transform .18s ease}
 .row.drag .face{transition:none}
 .row .bar{width:4px;align-self:stretch;border-radius:2px;background:var(--cons)}
@@ -77,7 +78,8 @@ main{flex:1;padding:6px 16px calc(150px + var(--safeB))}
 .row .nm b{display:block;font-weight:600;font-size:17px;overflow-wrap:anywhere}
 .row .nm span{font-size:13px;color:var(--dim)}
 .row .ct{min-width:64px;min-height:52px;border-radius:12px;background:var(--card2);font-size:24px;font-weight:750;font-variant-numeric:tabular-nums}
-.row.out .face{opacity:.45}
+.row.drag .under,.row.snap .under{visibility:visible}
+.row.out .face>*{opacity:.45}
 .row.out .ct{font-size:15px;font-weight:600}
 .empty{text-align:center;color:var(--dim);padding:40px 12px}
 .empty b{display:block;color:var(--ink);font-size:20px;margin-bottom:6px}
@@ -176,7 +178,7 @@ pre.msg{white-space:pre-wrap;background:var(--bg);border-radius:12px;padding:12p
 <div id="toast"></div>
 <script>
 {
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 const KEY = 'crewkit-consumables:v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -610,16 +612,18 @@ $('#main').addEventListener('click', e => {
 let drag = null, dragMoved = false;
 $('#main').addEventListener('pointerdown', e => {
   const row = e.target.closest('.row'); if (!row || ui.tab !== 'truck') return;
-  drag = {row, x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId};
+  drag = {row, x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId, dead: row.classList.contains('out')};
 });
 $('#main').addEventListener('pointermove', e => {
   if (!drag || e.pointerId !== drag.id) return;
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   if (!drag.on) {
     if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { drag = null; return; }
+    if (dx > 12 && dx > Math.abs(dy) && drag.dead) { drag.on = true; return; }
     if (dx > 12 && dx > Math.abs(dy)) { drag.on = true; drag.row.classList.add('drag'); try { drag.row.setPointerCapture(e.pointerId); } catch (_) {} }
     else return;
   }
+  if (drag.dead) return;
   drag.dx = Math.max(0, dx);
   drag.row.querySelector('.face').style.transform = `translateX(${Math.min(drag.dx, drag.row.clientWidth * .7)}px)`;
 });
@@ -628,12 +632,15 @@ function endDrag() {
   const d = drag; drag = null;
   if (!d.on) return;
   dragMoved = true; setTimeout(() => dragMoved = false, 50);
-  d.row.classList.remove('drag');
+  if (d.dead) { toast('None left on the truck'); return; }
+  d.row.classList.remove('drag'); d.row.classList.add('snap');
+  setTimeout(() => d.row.classList.remove('snap'), 220);
   d.row.querySelector('.face').style.transform = '';
   if (d.dx > Math.min(110, d.row.clientWidth * .3)) { const it = findItem(d.row.dataset.id); if (it) useN(it, 1); }
 }
 $('#main').addEventListener('pointerup', endDrag);
 $('#main').addEventListener('pointercancel', endDrag);
+$('#main').addEventListener('lostpointercapture', endDrag);
 
 /* ---------- sheets ---------- */
 function sheet(html, mount) {
