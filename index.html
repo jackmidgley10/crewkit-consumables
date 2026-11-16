@@ -178,7 +178,7 @@ pre.msg{white-space:pre-wrap;background:var(--bg);border-radius:12px;padding:12p
 <div id="toast"></div>
 <script>
 {
-const VERSION = '0.3.1';
+const VERSION = '0.3.2';
 const KEY = 'crewkit-consumables:v1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -612,15 +612,15 @@ $('#main').addEventListener('click', e => {
 let drag = null, dragMoved = false;
 $('#main').addEventListener('pointerdown', e => {
   const row = e.target.closest('.row'); if (!row || ui.tab !== 'truck') return;
-  drag = {row, x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId, dead: row.classList.contains('out')};
+  drag = {row, x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId, t: Date.now(), dead: row.classList.contains('out')};
 });
 $('#main').addEventListener('pointermove', e => {
   if (!drag || e.pointerId !== drag.id) return;
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   if (!drag.on) {
     if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { drag = null; return; }
-    if (dx > 12 && dx > Math.abs(dy) && drag.dead) { drag.on = true; return; }
-    if (dx > 12 && dx > Math.abs(dy)) { drag.on = true; drag.row.classList.add('drag'); try { drag.row.setPointerCapture(e.pointerId); } catch (_) {} }
+    if (dx > 8 && dx > Math.abs(dy) && drag.dead) { drag.on = true; return; }
+    if (dx > 8 && dx > Math.abs(dy)) { drag.on = true; drag.row.classList.add('drag'); try { drag.row.setPointerCapture(e.pointerId); } catch (_) {} }
     else return;
   }
   if (drag.dead) return;
@@ -636,11 +636,11 @@ function endDrag() {
   d.row.classList.remove('drag'); d.row.classList.add('snap');
   setTimeout(() => d.row.classList.remove('snap'), 220);
   d.row.querySelector('.face').style.transform = '';
-  if (d.dx > Math.min(110, d.row.clientWidth * .3)) { const it = findItem(d.row.dataset.id); if (it) useN(it, 1); }
+  const fast = d.dx > 40 && Date.now() - d.t < 250;
+  if (d.dx > Math.min(56, d.row.clientWidth * .15) || fast) { const it = findItem(d.row.dataset.id); if (it) useN(it, 1); }
 }
 $('#main').addEventListener('pointerup', endDrag);
 $('#main').addEventListener('pointercancel', endDrag);
-$('#main').addEventListener('lostpointercapture', endDrag);
 
 /* ---------- sheets ---------- */
 function sheet(html, mount) {
