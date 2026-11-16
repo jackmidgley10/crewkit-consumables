@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Consumables">
+<meta name="theme-color" content="#0d0e10">
+<title>CrewKit Consumables</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+/*
+VOICE: calm, quick, built for a cold truck tail-lift at 7am.
+IDEA: the driver's clipboard sheet: two lists, a tick-off, a note sent to the gaffer.
+PICTURE: the list itself, big rows, swipe right to sign a pack off.
+COLOUR and TYPE: CrewKit dark, amber for actions, pink for gels, teal for consumables; system SF.
+LAYOUT: header, two-way switch, list, bottom bar with Truck / Order.
+*/
+:root{color-scheme:dark;--bg:#0d0e10;--card:#17191c;--card2:#1f2226;--line:#2a2d33;--ink:#f3f3f4;--dim:#8d929b;--amber:#ffb020;--amberInk:#1a1200;--gel:#ff6fae;--cons:#35c9b8;--red:#ff5a52;--green:#3ccf6e;--safeB:env(safe-area-inset-bottom,0px);--safeT:env(safe-area-inset-top,0px)}
+:root[data-theme=light]{color-scheme:light;--bg:#f4f4f6;--card:#fff;--card2:#ececf0;--line:#dcdde2;--ink:#111214;--dim:#666b74;--amber:#e89400;--amberInk:#fff;--gel:#d92f7e;--cons:#0d9a8a}
+[hidden]{display:none!important}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:17px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;overflow-x:clip;-webkit-user-select:none;user-select:none}
+input,textarea,button,select{font:inherit;color:inherit}
+input,textarea{-webkit-user-select:text;user-select:text}
+button{cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+#app{max-width:720px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(var(--safeT) + 10px) 16px 8px}
+.hrow{display:flex;align-items:center;gap:10px}
+.job{flex:1;text-align:left;padding:6px 0;min-height:44px}
+.job b{display:block;font-size:24px;line-height:1.15;font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.job span{font-size:13px;color:var(--dim)}
+.icon{width:44px;height:44px;border-radius:22px;background:var(--card);display:grid;place-items:center;font-size:22px;line-height:1}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--card);border-radius:14px;padding:4px;margin-top:8px}
+.seg button{min-height:44px;border-radius:11px;font-weight:650;color:var(--dim);font-size:16px}
+.seg button.on{background:var(--card2);color:var(--ink)}
+.seg button.on.g{box-shadow:inset 0 -3px 0 var(--gel)}
+.seg button.on.c{box-shadow:inset 0 -3px 0 var(--cons)}
+.seg small{font-weight:500;opacity:.75;margin-left:4px}
+.find{margin-top:8px;width:100%;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);padding:0 14px;font-size:16px}
+main{flex:1;padding:6px 16px calc(150px + var(--safeB))}
+.hint{color:var(--dim);font-size:13px;text-align:center;padding:4px 0 8px}
+.list{display:flex;flex-direction:column;gap:8px}
+.row{position:relative;border-radius:16px;overflow:hidden;background:var(--green);touch-action:pan-y}
+.row .under{position:absolute;inset:0;display:flex;align-items:center;padding-left:20px;font-weight:700;color:#06210f}
+.row .face{position:relative;display:flex;align-items:center;gap:10px;background:var(--card);min-height:68px;padding:8px 8px 8px 14px;transition:transform .18s ease}
+.row.drag .face{transition:none}
+.row .bar{width:4px;align-self:stretch;border-radius:2px;background:var(--cons)}
+.row.gel .bar{background:var(--gel)}
+.row .nm{flex:1;text-align:left;padding:6px 0;min-height:44px}
+.row .nm b{display:block;font-weight:600;font-size:17px;overflow-wrap:anywhere}
+.row .nm span{font-size:13px;color:var(--dim)}
+.row .ct{min-width:64px;min-height:52px;border-radius:12px;background:var(--card2);font-size:24px;font-weight:750;font-variant-numeric:tabular-nums}
+.row.out .face{opacity:.45}
+.row.out .ct{font-size:15px;font-weight:600}
+.empty{text-align:center;color:var(--dim);padding:40px 12px}
+.empty b{display:block;color:var(--ink);font-size:20px;margin-bottom:6px}
+.big{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:54px;border-radius:14px;background:var(--amber);color:var(--amberInk);font-weight:700;font-size:17px;padding:0 16px}
+.big.sec{background:var(--card2);color:var(--ink)}
+.big.red{background:transparent;color:var(--red);border:1px solid var(--line)}
+.big:disabled{opacity:.4}
+.fab{position:fixed;right:max(16px,calc(50% - 344px));bottom:calc(84px + var(--safeB));z-index:6;min-height:54px;border-radius:27px;background:var(--amber);color:var(--amberInk);font-weight:700;padding:0 20px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:7;background:var(--card);border-top:1px solid var(--line);padding:6px 16px calc(6px + var(--safeB))}
+nav div{max-width:720px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+nav button{min-height:52px;border-radius:12px;font-weight:650;color:var(--dim);position:relative}
+nav button.on{color:var(--ink);background:var(--card2)}
+.badge{display:inline-block;min-width:22px;padding:1px 6px;border-radius:11px;background:var(--amber);color:var(--amberInk);font-size:13px;font-weight:750;margin-left:6px}
+h2{font-size:15px;font-weight:650;color:var(--dim);margin:18px 2px 8px;display:flex;align-items:center;gap:8px}
+h2 .dot{width:10px;height:10px;border-radius:5px;background:var(--cons)}
+h2 .dot.g{background:var(--gel)}
+h2 .sp{flex:1}
+.card{background:var(--card);border-radius:16px;overflow:hidden}
+.ol{display:flex;align-items:center;gap:10px;padding:10px 12px;min-height:60px;border-top:1px solid var(--line)}
+.ol:first-child{border-top:0}
+.ol .q{font-size:20px;font-weight:750;min-width:56px;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.ol .n{flex:1}
+.ol .n span{display:block;font-size:13px;color:var(--dim)}
+.step{display:flex;gap:6px}
+.step button,.sbtn{width:44px;height:44px;border-radius:12px;background:var(--card2);font-size:22px;font-weight:600}
+.pill{min-height:44px;padding:0 14px;border-radius:12px;background:var(--card2);font-weight:650;font-size:15px}
+.pill.go{background:var(--green);color:#06210f}
+.mini{font-size:14px;color:var(--amber);font-weight:650;min-height:36px;padding:0 6px}
+#scrim{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);display:none}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-width:720px;margin:0 auto;background:var(--card);border-radius:20px 20px 0 0;padding:10px 16px calc(16px + var(--safeB));max-height:88vh;overflow:auto;transform:translateY(105%);transition:transform .22s ease}
+#sheet.open{transform:none}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 10px}
+#sheet h3{margin:4px 0 12px;font-size:20px}
+#sheet p{color:var(--dim);margin:0 0 12px;font-size:15px}
+.fld{display:block;margin-bottom:12px}
+.fld>span{display:block;font-size:13px;color:var(--dim);margin-bottom:4px}
+.fld input,.fld textarea{width:100%;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--bg);padding:10px 12px;font-size:16px}
+.fld textarea{min-height:150px;resize:vertical;font-size:16px;line-height:1.4}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.two button{min-height:50px;border-radius:12px;background:var(--card2);font-weight:650}
+.two button.on.g{background:var(--gel);color:#2a0013}
+.two button.on.c{background:var(--cons);color:#00211d}
+.stack{display:flex;flex-direction:column;gap:8px}
+.qgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.qgrid button{min-height:60px;border-radius:14px;background:var(--card2);font-size:20px;font-weight:700}
+.bigstep{display:flex;align-items:center;justify-content:center;gap:18px;margin:6px 0 16px}
+.bigstep b{font-size:40px;min-width:70px;text-align:center;font-variant-numeric:tabular-nums}
+.bigstep button{width:60px;height:60px;border-radius:30px;background:var(--card2);font-size:30px}
+.prev{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.pv{display:flex;align-items:center;gap:6px;background:var(--bg);border-radius:12px;padding:6px}
+.pv input.q{width:56px;text-align:center;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:16px}
+.pv input.nm{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);padding:0 10px;font-size:16px}
+.pv .tg{min-width:52px;min-height:44px;border-radius:10px;font-weight:700;font-size:14px}
+.pv .tg.g{background:var(--gel);color:#2a0013}
+.pv .tg.c{background:var(--cons);color:#00211d}
+.pv .x{width:40px;min-height:44px;color:var(--dim);font-size:20px}
+.pv.warn input.q{border-color:var(--amber)}
+pre.msg{white-space:pre-wrap;background:var(--bg);border-radius:12px;padding:12px;font:15px/1.45 -apple-system,sans-serif;margin:0 0 12px;max-height:40vh;overflow:auto;-webkit-user-select:text;user-select:text}
+.menu button{display:flex;justify-content:space-between;align-items:center;width:100%;min-height:54px;padding:0 4px;border-top:1px solid var(--line);font-size:17px;text-align:left}
+.menu button:first-child{border-top:0}
+.menu button span{color:var(--dim);font-size:14px}
+#toast{position:fixed;left:50%;bottom:calc(150px + var(--safeB));transform:translateX(-50%) translateY(20px);opacity:0;z-index:30;background:#2b2f35;color:#fff;border-radius:14px;padding:6px 6px 6px 16px;display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);transition:.2s;pointer-events:none;font-size:15px}
+#toast.show{opacity:1;transform:translateX(-50%);pointer-events:auto}
+#toast button{min-height:40px;padding:0 14px;border-radius:10px;background:var(--amber);color:var(--amberInk);font-weight:700}
+#toast.plain{padding:12px 16px}
+.foot{position:sticky;bottom:calc(-16px - var(--safeB));background:var(--card);padding:10px 0 calc(16px + var(--safeB));margin-bottom:calc(-16px - var(--safeB))}
+.tip{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--amber);border-radius:14px;padding:12px 8px 12px 14px;margin:6px 0 12px;font-size:15px}
+.tip div{flex:1}.tip button{width:40px;height:40px;color:var(--dim);font-size:20px}
+.ver{color:var(--dim);font-size:12px;text-align:center;margin-top:14px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="hrow">
+      <button class="job" id="jobBtn"><b id="jobName">Consumables</b><span id="jobSub"></span></button>
+      <button class="icon" id="menuBtn" aria-label="Menu">⋯</button>
+    </div>
+    <div class="seg" id="seg">
+      <button data-c="gel" class="g">Gels<small id="nG"></small></button>
+      <button data-c="cons" class="c">Consumables<small id="nC"></small></button>
+    </div>
+    <input class="find" id="find" type="search" placeholder="Find" autocomplete="off">
+  </header>
+  <main id="main"></main>
+</div>
+<button class="fab" id="fab">+ Add</button>
+<nav><div>
+  <button id="tTruck" class="on">On the truck</button>
+  <button id="tOrder">Order<span class="badge" id="oBadge" hidden></span></button>
+</div></nav>
+<div id="scrim"></div>
+<div id="sheet" role="dialog" aria-modal="true"></div>
+<div id="toast"></div>
+<script>
+{
+const VERSION = '0.2.0';
+const KEY = 'crewkit-consumables:v1';
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const today = () => new Date().toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+
+/* ---------- storage ---------- */
+let storageOk = true;
+let S = load();
+function blank() { return {v:1, cur:null, jobs:{}, driver:'', log:[]}; }
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) { const d = JSON.parse(raw); if (d && d.jobs) { d.log = d.log || []; return d; } }
+  } catch (e) { storageOk = false; }
+  return blank();
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); storageOk = true; }
+  catch (e) { if (storageOk) { storageOk = false; logIt('error', 'Could not save: ' + e.message); toast('Couldn’t save on this phone. Keep this page open.'); } }
+}
+
+/* ---------- diagnostics log ---------- */
+function logIt(kind, msg) {
+  S.log.push([new Date().toISOString(), kind, String(msg).slice(0, 300)]);
+  if (S.log.length > 1500) S.log.splice(0, S.log.length - 1500);
+}
+window.addEventListener('error', e => { logIt('error', (e.message || 'error') + ' @' + (e.lineno || '?')); save(); });
+window.addEventListener('unhandledrejection', e => { logIt('error', 'promise: ' + ((e.reason && e.reason.message) || e.reason)); save(); });
+
+/* ---------- job + derived counts ---------- */
+const job = () => S.jobs[S.cur] || null;
+function newJob(name) {
+  const id = uid();
+  S.jobs[id] = {id, name: name || 'New job', created: Date.now(), items: [], ev: []};
+  S.cur = id; logIt('job', 'New job: ' + name); save();
+}
+function addEv(type, item, n, extra) {
+  const e = Object.assign({id: uid(), t: Date.now(), type, item, n}, extra || {});
+  job().ev.push(e); return e;
+}
+function stats(j) {
+  const m = {};
+  for (const it of j.items) m[it.id] = {deliver:0, use:0, arrive:0, order:0, adj:0, lastOrder:0};
+  for (const e of j.ev) {
+    const s = m[e.item]; if (!s || e.undone) continue;
+    if (e.type === 'deliver' || e.type === 'fix') s.deliver += e.n;
+    else if (e.type === 'use') s.use += e.n;
+    else if (e.type === 'back') s.use -= e.n;
+    else if (e.type === 'arrive') s.arrive += e.n;
+    else if (e.type === 'order') { s.order += e.n; s.lastOrder = e.t; }
+    else if (e.type === 'adj') s.adj += e.n;
+  }
+  for (const id in m) {
+    const s = m[id];
+    s.truck = s.deliver + s.arrive - s.use;
+    s.pending = Math.max(0, s.order - s.arrive);
+    const owed = Math.max(0, s.use - s.arrive);
+    s.toOrder = Math.max(0, owed - s.pending + s.adj);
+  }
+  return m;
+}
+const live = j => j.items.filter(i => !i.gone);
+
+/* ---------- what's a gel ---------- */
+const CONS_WORDS = /black ?wrap|cine ?foil|\bfoil\b|tape|\bclips?\b|crocs?|pegs?|\bties?\b|cable ties|sash|batter|\blamps?\b|bulbs?|fuses?|gloves?|spray|dulling|velcro|bungee|\brope\b|marker|sharpie|\bpens?\b|bin bags?|bags? of|wd-?40|zip|\bline\b|cord|gaffer/i;
+const GEL_WORDS = /\bgels?\b|\bcto\b|\bctb\b|\bct ?o\b|\bnd\b|\bn\.d\.?|\blee\b|rosco|supergel|e-?colou?r|\bl\d{3}\b|frost|diffusion|\bdiff\b|\bopal\b|hampshire|grid ?cloth|silent ?grid|black scrim|leelux|heat shield|\bclear\b|soft (gold|silver)|lct|cyan|fresh pink|bright rose|follies|cosmetic|nectarine|apricot|peacock|plasma red|fern green|flame green|spring yellow|sun colou?r|tough ?spun|\bspun\b|\b(216|250|251|252|129|400|410|420|430|434|450|452|460|480)\b|\bwhite diff|\bstraw\b|bastard amber|plus green|minus green|\b(1\/2|1\/4|1\/8|half|quarter|eighth|full|double) (cto|ctb|white|plus|minus|blue|straw|nd)|tokyo blue|primary red|steel blue|dark blue|medium blue|lavender|chocolate|magenta|\bcolou?r (roll|sheet)/i;
+function guessCat(name) {
+  if (CONS_WORDS.test(name)) return 'cons';
+  if (GEL_WORDS.test(name)) return 'gel';
+  return 'cons';
+}
+
+/* ---------- reading a pasted list ---------- */
+const HEAD_GEL = /^(gels?|gel\s*(&|and)\s*diff(usion)?|diffusion|colou?rs?|filters?)\s*:?$/i;
+const HEAD_CONS = /^(consumables?|expendables?|cons|sundries)\s*:?$/i;
+const NAME_NUM = /(\blee|\brosco|\bl|\be-?colou?r|\bnd|\bcto|\bctb|\bsupergel|\broscolux|#|\bno\.?)\s*$/i;
+const UNIT = '(?:\\s*(?:rolls?|boxe?s|box|bags?|hanks?|packs?|packets?|reels?|sheets?|pcs?|each|ea|off))?';
+function parseList(text) {
+  let sec = null; const out = [];
+  for (let raw of text.split(/\r?\n/)) {
+    let line = raw.replace(/^[\s\-•*·–>]+/, '').replace(/\s+$/, '');
+    if (!line) continue;
+    const plain = line.replace(/\t+/g, ' ').trim();
+    if (HEAD_GEL.test(plain)) { sec = 'gel'; continue; }
+    if (HEAD_CONS.test(plain)) { sec = 'cons'; continue; }
+    if (/£|\btotal\b|^qty\b|^quantity\b|^item\b/i.test(plain)) continue;
+    let qty = null, name = null;
+    if (line.includes('\t')) {
+      const cells = line.split('\t').map(c => c.trim()).filter(Boolean);
+      const qi = cells.findIndex(c => /^\d+$/.test(c));
+      if (qi >= 0) { qty = +cells[qi]; name = cells.filter((_, i) => i !== qi).join(' '); }
+      else name = cells.join(' ');
+    } else {
+      let m;
+      if ((m = plain.match(/^(\d+)\s*[x×]\s*(.+)$/i))) { qty = +m[1]; name = m[2]; }
+      else if ((m = plain.match(new RegExp('^(.+?)\\s*(?:[x×]|[-–:=]|\\()\\s*(\\d+)\\)?' + UNIT + '$', 'i')))) { qty = +m[2]; name = m[1]; }
+      else if ((m = plain.match(/^(\d+)\s+(.+)$/)) && !(+m[1] >= 100 && GEL_WORDS.test(m[2]))) { qty = +m[1]; name = m[2]; }
+      else if ((m = plain.match(new RegExp('^(.+?)\\s+(\\d{1,3})' + UNIT + '$', 'i'))) && !NAME_NUM.test(m[1])) { qty = +m[2]; name = m[1]; }
+      else name = plain;
+    }
+    name = (name || '').replace(/^(of|off)\s+/i, '').replace(/[\s,;:.\-]+$/, '').trim();
+    if (!name || name.length < 2 || !/[a-z]/i.test(name)) continue;
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+    const sure = qty != null && qty > 0;
+    out.push({name, qty: sure ? Math.min(qty, 999) : 1, unsure: !sure, cat: sec || guessCat(name)});
+  }
+  return mergeRows(out);
+}
+const norm = s => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/* ---------- loading a Sunbelt sheet (PDF) ----------
+   Sunbelt truck-package forms end with a Consumables section:
+     left block  = gels: Qty | Double | Full | 3/4 | 1/2 | 1/4 | 1/8 | name
+     right block = consumables: Qty | name
+   The section can run onto the next page with no headings, so the columns
+   found under the heading carry over. Reads word positions, not text order. */
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+let pdfjsReady = null;
+function loadPdfjs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfjsReady) return pdfjsReady;
+  pdfjsReady = new Promise((ok, no) => {
+    const sc = document.createElement('script');
+    sc.src = PDFJS + 'pdf.min.js';
+    sc.onload = () => { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; } catch (e) {} ok(window.pdfjsLib); };
+    sc.onerror = () => { pdfjsReady = null; no(new Error('Couldn’t load the PDF reader. It needs signal the first time.')); };
+    document.head.appendChild(sc);
+  });
+  return pdfjsReady;
+}
+async function readPdf(file) {
+  const lib = await loadPdfjs();
+  const doc = await lib.getDocument({data: new Uint8Array(await file.arrayBuffer())}).promise;
+  const pages = [];
+  for (let n = 1; n <= doc.numPages; n++) {
+    const pg = await doc.getPage(n), h = pg.getViewport({scale: 1}).height;
+    const tc = await pg.getTextContent();
+    pages.push(tc.items.filter(i => i.str && i.str.trim()).map(i => ({s: i.str, x: i.transform[4], y: h - i.transform[5], w: i.width})));
+  }
+  return pages;
+}
+/* split text runs into words, each with its own x, then group into rows top to bottom */
+function pageRows(items) {
+  const words = [];
+  for (const it of items) {
+    const cw = it.s.length ? it.w / it.s.length : 0;
+    const re = /\S+/g; let m;
+    while ((m = re.exec(it.s))) words.push({t: m[0], x: it.x + m.index * cw, w: m[0].length * cw, y: it.y});
+  }
+  words.sort((a, b) => a.y - b.y || a.x - b.x);
+  const rows = [];
+  for (const w of words) {
+    const r = rows[rows.length - 1];
+    if (r && Math.abs(w.y - r.y) <= 3.5) r.w.push(w); else rows.push({y: w.y, w: [w]});
+  }
+  for (const r of rows) r.w.sort((a, b) => a.x - b.x);
+  return rows;
+}
+const mid = w => w.x + w.w / 2;
+const STRENGTH = {double: 'Double', full: 'Full', '3/4': '3/4', '1/2': '1/2', '1/4': '1/4', '1/8': '1/8'};
+const STRENGTH_ORDER = ['double', 'full', '3/4', '1/2', '1/4', '1/8'];
+function findHeader(rows) {
+  for (let k = 0; k < rows.length; k++) {
+    const ws = rows[k].w, low = ws.map(w => w.t.toLowerCase());
+    const ci = low.reduce((a, t, i) => (t === 'consumables' ? a.concat(i) : a), []);
+    if (ci.length < 2 || !low.includes('qty') || !low.includes('1/2')) continue;
+    const leftQ = low.indexOf('qty'), rq = low.slice(0, ci[1]).lastIndexOf('qty');
+    if (rq <= leftQ) continue;
+    const cols = {qty: mid(ws[leftQ]), grid: {}, rQty: mid(ws[rq]), split: ws[rq].x - 8};
+    for (const w of ws) { const key = w.t.toLowerCase(); if (STRENGTH[key] && key !== 'double' && w.x < cols.split) cols.grid[key] = mid(w); }
+    // "Double" is printed broken over two lines ("Doubl" / "e") just above or below the heading
+    for (let j = Math.max(0, k - 2); j <= Math.min(rows.length - 1, k + 2); j++)
+      for (const w of rows[j].w) if (/^doubl(e)?$/i.test(w.t) && w.x < cols.split) cols.grid.double = mid(w) + (w.t.length === 5 ? 3 : 0);
+    return {k, cols};
+  }
+  return null;
+}
+const isNum = t => /^\d+$/.test(t);
+const NOT_KIT = /\btruck\b|\bluton\b|generator|\bvan\b|bespoke/i;
+function gelName(n) {
+  n = n.replace(/^4\s*ft\s+rolls?\s+of\s+/i, '').trim();
+  return n.charAt(0).toUpperCase() + n.slice(1);
+}
+function parseSunbelt(pages) {
+  let cols = null; const out = [];
+  for (const items of pages) {
+    const rows = pageRows(items);
+    let start = 0;
+    const h = findHeader(rows);
+    if (h) { cols = h.cols; start = h.k + 1; }
+    if (!cols) continue;
+    for (let k = start; k < rows.length; k++) {
+      const ws = rows[k].w, txt = ws.map(w => w.t).join(' ');
+      if (/list version/i.test(txt) || /^(e|doubl|double)$/i.test(txt)) continue;
+      const left = ws.filter(w => w.x < cols.split), right = ws.filter(w => w.x >= cols.split);
+      // gels: leading numbers sit under Qty or a strength column; the first word starts the name
+      let qty = 0, i = 0; const grid = {};
+      const targets = [['qty', cols.qty]].concat(Object.entries(cols.grid));
+      while (i < left.length && isNum(left[i].t)) {
+        const c = mid(left[i]);
+        const near = targets.map(([key, x]) => [key, Math.abs(c - x)]).sort((a, b) => a[1] - b[1])[0];
+        if (near[1] > 14) break;
+        if (near[0] === 'qty') { if (Object.keys(grid).length) break; qty = +left[i].t; i++; break; }
+        if (+left[i].t > 99) break;
+        grid[near[0]] = +left[i].t; i++;
+      }
+      const gName = left.slice(i).map(w => w.t).join(' ').trim();
+      if (gName && /[a-z]/i.test(gName)) {
+        const base = gelName(gName);
+        if (qty > 0) out.push({name: base, qty, cat: 'gel'});
+        for (const key of STRENGTH_ORDER) if (grid[key] > 0) out.push({name: STRENGTH[key] + ' ' + base, qty: grid[key], cat: 'gel'});
+      }
+      // consumables: a number under the right-hand Qty, then the name
+      if (right.length > 1 && isNum(right[0].t) && Math.abs(mid(right[0]) - cols.rQty) <= 16) {
+        const nm = right.slice(1).map(w => w.t).join(' ').trim(), q = +right[0].t;
+        if (q > 0 && /[a-z]/i.test(nm) && !NOT_KIT.test(nm)) out.push({name: nm.charAt(0).toUpperCase() + nm.slice(1), qty: q, cat: 'cons'});
+      }
+    }
+  }
+  return {found: !!cols, rows: mergeRows(out)};
+}
+function mergeRows(arr) {
+  const merged = [];
+  for (const r of arr) {
+    const k = norm(r.name), hit = merged.find(x => norm(x.name) === k && x.cat === r.cat);
+    if (hit) hit.qty += r.qty; else merged.push(Object.assign({}, r));
+  }
+  return merged;
+}
+
+/* ---------- add to Home Screen (iPhone) ----------
+   On iPhone the Home Screen app keeps its own data, separate from Safari, and Safari
+   can clear a website's data after a week unused. So the app is used from the icon. */
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const onOwnSite = window.top === window && location.protocol === 'https:';
+const standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+function homeTip() {
+  if (!isIOS || !onOwnSite || standalone || S.tipOff) return '';
+  return `<div class="tip"><div><b>Put this on your Home Screen first.</b><br>Tap Share <span aria-hidden="true">↑</span>, then <b>Add to Home Screen</b>. Always open it from that icon — your list is kept there.</div><button data-act="tipOff" aria-label="Hide">×</button></div>`;
+}
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+
+/* ---------- UI state ---------- */
+const ui = {tab: 'truck', cat: 'gel', q: '', undo: null};
+
+function render() {
+  const j = job();
+  $('#jobName').textContent = j ? j.name : 'Consumables';
+  if (!j) { $('#seg').hidden = true; $('#find').hidden = true; $('#fab').hidden = true; $('#main').innerHTML = homeTip() + welcome(); bindWelcome(); setNav(0); return; }
+  $('#seg').hidden = false; $('#fab').hidden = ui.tab !== 'truck';
+  const st = stats(j), items = live(j);
+  const gels = items.filter(i => i.cat === 'gel'), cons = items.filter(i => i.cat === 'cons');
+  const sum = arr => arr.reduce((a, i) => a + Math.max(0, st[i.id].truck), 0);
+  $('#nG').textContent = gels.length ? sum(gels) : '';
+  $('#nC').textContent = cons.length ? sum(cons) : '';
+  for (const b of $('#seg').children) b.classList.toggle('on', b.dataset.c === ui.cat);
+  const toOrd = items.reduce((a, i) => a + st[i.id].toOrder, 0);
+  const pend = items.reduce((a, i) => a + st[i.id].pending, 0);
+  $('#jobSub').textContent = items.length ? `${toOrd ? toOrd + ' to order' : 'Nothing to order'}${pend ? ' · ' + pend + ' on order' : ''}` : 'No list yet';
+  setNav(toOrd);
+  $('#seg').hidden = ui.tab !== 'truck'; $('#find').hidden = ui.tab !== 'truck' || items.length < 12;
+  $('#main').innerHTML = homeTip() + (ui.tab === 'truck' ? truckView(j, st, items) : orderView(j, st, items));
+}
+function setNav(n) {
+  $('#tTruck').classList.toggle('on', ui.tab === 'truck');
+  $('#tOrder').classList.toggle('on', ui.tab === 'order');
+  const b = $('#oBadge'); b.hidden = !n; b.textContent = n;
+}
+function welcome() {
+  const others = Object.values(S.jobs);
+  return `<div class="empty"><b>Consumables check</b>Load the gels and consumables that came on the truck. Swipe a pack off as it's used and it goes on the order list.</div>
+  <div class="stack"><button class="big" id="wNew">Start a job</button>${others.length ? '<button class="big sec" id="wJobs">Open a previous job</button>' : ''}</div>`;
+}
+function bindWelcome() {
+  const n = $('#wNew'); if (n) n.onclick = openNewJob;
+  const o = $('#wJobs'); if (o) o.onclick = openJobs;
+}
+function truckView(j, st, items) {
+  if (!items.length) return `<div class="empty"><b>No list yet</b>Load the Sunbelt sheet, or paste or type what was delivered. Gels and consumables get sorted for you.</div><button class="big" data-act="add">Add the delivery</button>`;
+  const q = norm(ui.q);
+  const rows = items.filter(i => i.cat === ui.cat && (!q || norm(i.name).includes(q))); // sheet order, so it matches the paperwork
+  if (!rows.length) return `<div class="empty">${q ? 'Nothing matches.' : `No ${ui.cat === 'gel' ? 'gels' : 'consumables'} on this list.`}</div>`;
+  return `<div class="hint">Swipe right when a pack's used · tap the name to edit</div><div class="list">${rows.map(i => rowHtml(i, st[i.id])).join('')}</div>`;
+}
+function rowHtml(i, s) {
+  const t = Math.max(0, s.truck), out = t === 0;
+  const bits = [];
+  if (s.use > 0) bits.push(s.use + ' used');
+  if (s.pending) bits.push(s.pending + ' on order');
+  return `<div class="row ${i.cat === 'gel' ? 'gel' : ''} ${out ? 'out' : ''}" data-id="${i.id}">
+    <div class="under">Used 1 →</div>
+    <div class="face"><div class="bar"></div>
+      <button class="nm" data-act="edit"><b>${esc(i.name)}</b><span>${bits.join(' · ') || 'Full delivery on the truck'}</span></button>
+      <button class="ct" data-act="count">${out ? 'None' : t}</button>
+    </div></div>`;
+}
+function orderView(j, st, items) {
+  const to = items.filter(i => st[i.id].toOrder > 0), wait = items.filter(i => st[i.id].pending > 0);
+  const group = (arr, fn) => ['gel', 'cons'].map(c => {
+    const a = arr.filter(i => i.cat === c);
+    return a.length ? `<h2><i class="dot ${c === 'gel' ? 'g' : ''}"></i>${c === 'gel' ? 'Gels' : 'Consumables'}</h2><div class="card">${a.map(fn).join('')}</div>` : '';
+  }).join('');
+  let h = '';
+  if (!to.length && !wait.length) {
+    h = `<div class="empty"><b>Nothing to order</b>Packs you swipe off the truck land here, ready to send.</div>`;
+  }
+  if (to.length) {
+    h += `<h2>To order<span class="sp"></span></h2>` + group(to, i => `<div class="ol" data-id="${i.id}"><div class="q">${st[i.id].toOrder} \u00d7</div><div class="n">${esc(i.name)}</div><div class="step"><button data-act="less" aria-label="One less">−</button><button data-act="more" aria-label="One more">+</button></div></div>`);
+    h += `<div style="margin-top:14px"><button class="big" data-act="send">Send order</button></div>`;
+  }
+  if (wait.length) {
+    h += `<h2 style="margin-top:26px">Waiting for delivery<span class="sp"></span><button class="mini" data-act="allArrived">All arrived</button></h2>` +
+      group(wait, i => `<div class="ol" data-id="${i.id}"><div class="q">${st[i.id].pending} \u00d7</div><div class="n">${esc(i.name)}<span>Ordered ${new Date(st[i.id].lastOrder).toLocaleDateString('en-GB', {day:'numeric', month:'short'})}</span></div><button class="pill go" data-act="arrived">Arrived</button></div>`);
+  }
+  if (!to.length) h += `<div style="margin-top:18px"><button class="big sec" data-act="addOrder">+ Order something else</button></div>`;
+  return h;
+}
+
+/* ---------- actions ---------- */
+function act(type, it, n, label, extra) {
+  const e = addEv(type, it.id, n, extra);
+  logIt(type, `${n} × ${it.name}`); save(); render();
+  ui.undo = [e.id];
+  toast(label, () => {
+    for (const ev of job().ev) if (ui.undo && ui.undo.includes(ev.id)) ev.undone = true;
+    logIt('undo', `${type} ${n} × ${it.name}`); ui.undo = null; save(); render(); toast('Undone');
+  });
+}
+const findItem = id => job().items.find(i => i.id === id);
+function useN(it, n) {
+  const s = stats(job())[it.id];
+  n = Math.min(n, Math.max(0, s.truck));
+  if (n <= 0) { toast('None left on the truck'); return; }
+  act('use', it, n, `${n} × ${it.name} used → order list`);
+}
+
+$('#main').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  if (dragMoved) { dragMoved = false; return; }
+  const r = b.closest('[data-id]'), it = r && findItem(r.dataset.id), a = b.dataset.act;
+  if (a === 'add') openAdd();
+  else if (a === 'edit') openEdit(it);
+  else if (a === 'count') openCount(it);
+  else if (a === 'more' || a === 'less') { addEv('adj', it.id, a === 'more' ? 1 : -1); logIt('orderqty', `${a} ${it.name}`); save(); render(); }
+  else if (a === 'send') openSend();
+  else if (a === 'arrived') openArrived(it);
+  else if (a === 'allArrived') allArrived();
+  else if (a === 'addOrder') openAddOrder();
+  else if (a === 'tipOff') { S.tipOff = true; save(); render(); }
+});
+
+/* swipe right = used */
+let drag = null, dragMoved = false;
+$('#main').addEventListener('pointerdown', e => {
+  const row = e.target.closest('.row'); if (!row || ui.tab !== 'truck') return;
+  drag = {row, x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId};
+});
+$('#main').addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!drag.on) {
+    if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { drag = null; return; }
+    if (dx > 12 && dx > Math.abs(dy)) { drag.on = true; drag.row.classList.add('drag'); try { drag.row.setPointerCapture(e.pointerId); } catch (_) {} }
+    else return;
+  }
+  drag.dx = Math.max(0, dx);
+  drag.row.querySelector('.face').style.transform = `translateX(${Math.min(drag.dx, drag.row.clientWidth * .7)}px)`;
+});
+function endDrag() {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.on) return;
+  dragMoved = true; setTimeout(() => dragMoved = false, 50);
+  d.row.classList.remove('drag');
+  d.row.querySelector('.face').style.transform = '';
+  if (d.dx > Math.min(110, d.row.clientWidth * .3)) { const it = findItem(d.row.dataset.id); if (it) useN(it, 1); }
+}
+$('#main').addEventListener('pointerup', endDrag);
+$('#main').addEventListener('pointercancel', endDrag);
+
+/* ---------- sheets ---------- */
+function sheet(html, mount) {
+  const sh = $('#sheet');
+  sh.innerHTML = '<div class="grab"></div>' + html;
+  $('#scrim').style.display = 'block';
+  requestAnimationFrame(() => sh.classList.add('open'));
+  hideToast();
+  if (mount) mount(sh);
+}
+function closeSheet() { $('#sheet').classList.remove('open'); $('#scrim').style.display = 'none'; }
+$('#scrim').onclick = closeSheet;
+function askConfirm(title, body, yes, fn, danger) {
+  sheet(`<h3>${esc(title)}</h3><p>${esc(body)}</p><div class="stack"><button class="big ${danger ? 'red' : ''}" id="cfY">${esc(yes)}</button><button class="big sec" id="cfN">Cancel</button></div>`, () => {
+    $('#cfY').onclick = () => { closeSheet(); fn(); };
+    $('#cfN').onclick = closeSheet;
+  });
+}
+
+function openCount(it) {
+  const t = Math.max(0, stats(job())[it.id].truck);
+  if (!t) { openEdit(it); return; }
+  const opts = [...new Set([1, 2, 5].filter(n => n < t).concat([t]))];
+  sheet(`<h3>${esc(it.name)}</h3><p>${t} on the truck. How many used?</p><div class="qgrid">${opts.map(n => `<button data-n="${n}">${n === t && n > 1 ? 'All ' + n : n}</button>`).join('')}</div><div class="stack"><button class="big sec" id="cTot">Change the total delivered</button><button class="big sec" id="cX">Cancel</button></div>`, sh => {
+    $('#cTot').onclick = () => openEdit(it);
+    sh.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { closeSheet(); useN(it, +b.dataset.n); });
+    $('#cX').onclick = closeSheet;
+  });
+}
+
+function openEdit(it) {
+  const s = stats(job())[it.id];
+  let cat = it.cat, total = s.deliver;
+  sheet(`<h3>Edit</h3>
+    <label class="fld"><span>Name</span><input id="eName" value="${esc(it.name)}" autocomplete="off"></label>
+    <div class="fld"><span>Which list</span></div>
+    <div class="two"><button data-c="gel" class="g">Gels</button><button data-c="cons" class="c">Consumables</button></div>
+    <div class="fld"><span>Total delivered</span></div>
+    <div class="bigstep"><button id="eM" aria-label="One less">−</button><b id="eT">${total}</b><button id="eP" aria-label="One more">+</button></div>
+    <p id="eInfo" style="text-align:center;margin-top:-6px"></p>
+    <div class="stack">
+      <button class="big" id="eDone">Done</button>
+      ${s.use > 0 ? `<button class="big sec" id="eBack">Put 1 back on the truck (not used)</button>` : ''}
+      <button class="big red" id="eDel">Delete from the list</button>
+    </div>`, sh => {
+    const paint = () => {
+      sh.querySelectorAll('.two button').forEach(b => b.classList.toggle('on', b.dataset.c === cat));
+      $('#eT').textContent = total;
+      $('#eInfo').textContent = `${Math.max(0, s.truck + total - s.deliver)} on the truck` + (s.use ? ` · ${s.use} used` : '') + (s.arrive ? ` · ${s.arrive} restocked` : '');
+    };
+    paint();
+    sh.querySelectorAll('.two button').forEach(b => b.onclick = () => { cat = b.dataset.c; paint(); });
+    $('#eM').onclick = () => { if (total > 0 && s.truck + total - 1 - s.deliver >= 0) { total--; paint(); } };
+    $('#eP').onclick = () => { total++; paint(); };
+    $('#eDone').onclick = () => {
+      const nm = $('#eName').value.trim();
+      const msgs = [];
+      if (nm && nm !== it.name) { addEv('rename', it.id, 0, {from: it.name, to: nm}); logIt('rename', `"${it.name}" → "${nm}"`); it.name = nm; msgs.push('Renamed'); }
+      if (cat !== it.cat) { addEv('move', it.id, 0, {from: it.cat, to: cat}); logIt('move', `${it.name}: ${it.cat} → ${cat}`); it.cat = cat; ui.cat = cat; msgs.push('Moved to ' + (cat === 'gel' ? 'Gels' : 'Consumables')); }
+      const diff = total - s.deliver;
+      if (diff) { addEv('fix', it.id, diff); logIt('fix', `${it.name}: delivered ${s.deliver} → ${total}`); msgs.push('Total changed'); }
+      save(); closeSheet(); render(); if (msgs.length) toast(msgs.join(' · '));
+    };
+    const bk = $('#eBack'); if (bk) bk.onclick = () => { closeSheet(); act('back', it, 1, `1 × ${it.name} back on the truck`); };
+    $('#eDel').onclick = () => askConfirm('Delete ' + it.name + '?', 'It comes off the list and the order. This is noted in the log.', 'Delete', () => {
+      it.gone = true; addEv('delete', it.id, 0); logIt('delete', it.name); save(); render(); toast('Deleted ' + it.name);
+    }, true);
+  });
+}
+
+function openAdd() {
+  sheet(`<h3>Add to the list</h3>
+    <label class="big sec" style="margin-bottom:12px">Load a Sunbelt sheet (PDF)<input type="file" id="aFile" accept=".pdf,application/pdf" hidden></label>
+    <p id="aMsg">Or paste or type it, one item per line. "10 x Black wrap", "Full CTO 3" and "GELS" / "CONSUMABLES" headings all work.</p>
+    <label class="fld"><span>Delivery</span><textarea id="aTxt" placeholder="10 x Rolls of black wrap\n4 x Boxes of crocs\n2 x Hanks of sash\nFull CTO x 3"></textarea></label>
+    <div id="aPrev" class="prev"></div>
+    <div class="stack foot"><button class="big" id="aGo" disabled>Add</button><button class="big sec" id="aX">Cancel</button></div>`, () => {
+    let rows = [], fromFile = [];
+    const paint = () => {
+      $('#aPrev').innerHTML = rows.length ? `<div class="fld"><span>Check these · tap Gel / Con to swap lists</span></div>` + rows.map((r, k) => `<div class="pv ${r.unsure ? 'warn' : ''}" data-k="${k}"><input class="q" inputmode="numeric" value="${r.qty}" aria-label="Quantity"><input class="nm" value="${esc(r.name)}" aria-label="Name"><button class="tg ${r.cat === 'gel' ? 'g' : 'c'}">${r.cat === 'gel' ? 'Gel' : 'Con'}</button><button class="x" aria-label="Remove">×</button></div>`).join('') + (rows.some(r => r.unsure) ? '<p>Amber boxes had no number, so they’re set to 1.</p>' : '') : '';
+      $('#aGo').disabled = !rows.length;
+      $('#aGo').textContent = rows.length ? `Add ${rows.length} item${rows.length > 1 ? 's' : ''}` : 'Add';
+    };
+    $('#aTxt').oninput = () => { rows = mergeRows(fromFile.concat(parseList($('#aTxt').value))); paint(); };
+    $('#aFile').onchange = async e => {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      $('#aMsg').textContent = 'Reading ' + f.name + '…';
+      try {
+        const pages = await readPdf(f), res = parseSunbelt(pages);
+        if (!res.rows.length) {
+          const sample = pages.flat().slice(0, 40).map(i => i.s).join(' | ').slice(0, 280);
+          logIt('import', `Nothing found in ${f.name} (${pages.length} pages, Consumables heading ${res.found ? 'found' : 'not found'}). Text: ${sample}`);
+          $('#aMsg').textContent = res.found ? 'Found the Consumables section, but nothing on it has a number.' : 'Couldn’t find a Consumables section on this sheet. Paste the list instead, then use Report a problem so this sheet can be added.';
+        } else {
+          const g = res.rows.filter(r => r.cat === 'gel').length;
+          logIt('import', `${f.name}: ${g} gels, ${res.rows.length - g} consumables`);
+          fromFile = res.rows;
+          rows = mergeRows(fromFile.concat(parseList($('#aTxt').value)));
+          $('#aMsg').textContent = `From ${f.name}: ${g} gels and ${res.rows.length - g} consumables. Check the numbers, then Add.`;
+          paint();
+        }
+      } catch (err) { logIt('error', 'import ' + f.name + ': ' + err.message); $('#aMsg').textContent = err.message || 'Couldn’t read that file.'; }
+      e.target.value = '';
+    };
+    $('#aPrev').addEventListener('input', e => {
+      const k = +e.target.closest('.pv').dataset.k, r = rows[k];
+      if (e.target.classList.contains('q')) { r.qty = Math.max(0, parseInt(e.target.value, 10) || 0); r.unsure = false; e.target.closest('.pv').classList.remove('warn'); }
+      else r.name = e.target.value;
+    });
+    $('#aPrev').addEventListener('click', e => {
+      const pv = e.target.closest('.pv'); if (!pv) return; const k = +pv.dataset.k;
+      if (e.target.classList.contains('tg')) { rows[k].cat = rows[k].cat === 'gel' ? 'cons' : 'gel'; rows[k].flipped = true; paint(); }
+      else if (e.target.classList.contains('x')) { rows.splice(k, 1); paint(); }
+    });
+    $('#aGo').onclick = () => {
+      const j = job(); let added = 0, topped = 0;
+      for (const r of rows) {
+        const nm = r.name.trim(); if (!nm || r.qty <= 0) continue;
+        let it = live(j).find(i => norm(i.name) === norm(nm));
+        if (it) topped++;
+        else { it = {id: uid(), name: nm, cat: r.cat}; j.items.push(it); added++; if (r.flipped) logIt('guess', `"${nm}" guessed ${guessCat(nm)}, set to ${r.cat}`); }
+        addEv('deliver', it.id, r.qty);
+      }
+      logIt('add', `Added ${added} new, topped up ${topped} (${rows.length} lines pasted)`);
+      if (rows.length) ui.cat = rows.some(r => r.cat === ui.cat) ? ui.cat : rows[0].cat;
+      save(); closeSheet(); render(); toast(`${added} added${topped ? ', ' + topped + ' topped up' : ''}`);
+    };
+    $('#aX').onclick = closeSheet;
+  });
+}
+
+function openAddOrder() {
+  const j = job(), items = live(j).slice().sort((a, b) => a.name.localeCompare(b.name));
+  sheet(`<h3>Order something else</h3><p>For something running low that hasn't been swiped off yet.</p><div class="card menu">${items.map(i => `<button data-id="${i.id}">${esc(i.name)}<span>${i.cat === 'gel' ? 'Gel' : 'Consumable'}</span></button>`).join('')}</div><div style="margin-top:12px"><button class="big sec" id="oX">Cancel</button></div>`, sh => {
+    sh.querySelectorAll('[data-id]').forEach(b => b.onclick = () => { const it = findItem(b.dataset.id); addEv('adj', it.id, 1); logIt('orderqty', 'extra ' + it.name); save(); closeSheet(); render(); toast(`1 × ${it.name} added to the order`); });
+    $('#oX').onclick = closeSheet;
+  });
+}
+
+function orderText(j, st, items) {
+  const lines = [`${j.name}`, `Consumables order, ${today()}`];
+  for (const c of ['gel', 'cons']) {
+    const a = items.filter(i => i.cat === c && st[i.id].toOrder > 0);
+    if (!a.length) continue;
+    lines.push('', c === 'gel' ? 'GELS' : 'CONSUMABLES');
+    for (const i of a) lines.push(`${st[i.id].toOrder} × ${i.name}`);
+  }
+  if (S.driver) lines.push('', 'From ' + S.driver);
+  return lines.join('\n');
+}
+function openSend() {
+  const j = job(), st = stats(j), items = live(j);
+  const txt = orderText(j, st, items);
+  const canShare = !!navigator.share && window.top === window;
+  sheet(`<h3>Send the order</h3><pre class="msg">${esc(txt)}</pre>
+    <label class="fld"><span>Your name (goes at the bottom)</span><input id="sDrv" value="${esc(S.driver || '')}" placeholder="e.g. Dave" autocomplete="name"></label>
+    <div class="stack">${canShare ? '<button class="big" id="sShare">Share…</button>' : ''}<button class="big ${canShare ? 'sec' : ''}" id="sCopy">Copy to paste in a message</button><button class="big sec" id="sX">Cancel</button></div>
+    <p style="margin-top:12px">Once it's sent, these lines move to Waiting for delivery.</p>`, () => {
+    const getTxt = () => { S.driver = $('#sDrv').value.trim(); return orderText(j, st, items); };
+    $('#sDrv').oninput = () => { S.driver = $('#sDrv').value.trim(); save(); document.querySelector('pre.msg').textContent = orderText(j, st, items); };
+    const done = how => {
+      const n = items.reduce((a, i) => a + st[i.id].toOrder, 0);
+      const ids = [];
+      for (const i of items) { const s = st[i.id]; if (s.toOrder > 0) { ids.push(addEv('order', i.id, s.toOrder).id); if (s.adj) ids.push(addEv('adj', i.id, -s.adj).id); } }
+      logIt('order', `Sent ${n} packs by ${how}`); save(); closeSheet(); render();
+      ui.undo = ids;
+      toast(how === 'copy' ? 'Copied · paste it in a message' : 'Order sent', () => {
+        for (const ev of job().ev) if (ids.includes(ev.id)) ev.undone = true;
+        logIt('undo', 'order send'); save(); render(); toast('Back on To order');
+      });
+    };
+    const sh = $('#sShare');
+    if (sh) sh.onclick = async () => {
+      try { await navigator.share({text: getTxt()}); done('share'); }
+      catch (e) { if (e && e.name === 'AbortError') return; logIt('error', 'share: ' + e.message); toast('Sharing didn’t work. Use Copy.'); }
+    };
+    $('#sCopy').onclick = async () => {
+      const t = getTxt();
+      if (await copyText(t)) done('copy');
+      else { logIt('error', 'copy refused'); const p = document.querySelector('pre.msg'); selectEl(p); toast('Press and hold the text to copy it'); }
+    };
+    $('#sX').onclick = closeSheet;
+  });
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
+  try {
+    const ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, t.length);
+    const ok = document.execCommand('copy'); ta.remove(); return ok;
+  } catch (e) { return false; }
+}
+function selectEl(el) { try { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } catch (e) {} }
+
+function openArrived(it) {
+  const p = stats(job())[it.id].pending;
+  if (p === 1) { act('arrive', it, 1, `1 × ${it.name} back on the truck`); return; }
+  let n = p;
+  sheet(`<h3>${esc(it.name)}</h3><p>${p} on order. How many arrived?</p><div class="bigstep"><button id="rM">−</button><b id="rN">${n}</b><button id="rP">+</button></div><div class="stack"><button class="big" id="rGo">Arrived · put on the truck</button><button class="big sec" id="rX">Cancel</button></div>`, () => {
+    $('#rM').onclick = () => { if (n > 1) $('#rN').textContent = --n; };
+    $('#rP').onclick = () => { if (n < p) $('#rN').textContent = ++n; };
+    $('#rGo').onclick = () => { closeSheet(); act('arrive', it, n, `${n} × ${it.name} back on the truck`); };
+    $('#rX').onclick = closeSheet;
+  });
+}
+function allArrived() {
+  const j = job(), st = stats(j), w = live(j).filter(i => st[i.id].pending > 0);
+  const n = w.reduce((a, i) => a + st[i.id].pending, 0);
+  askConfirm('Everything arrived?', `${n} pack${n > 1 ? 's' : ''} go back on the truck.`, 'Yes, all arrived', () => {
+    const ids = w.map(i => addEv('arrive', i.id, st[i.id].pending).id);
+    logIt('arrive', `All arrived: ${n} packs`); save(); render(); ui.undo = ids;
+    toast(`${n} back on the truck`, () => { for (const ev of job().ev) if (ids.includes(ev.id)) ev.undone = true; logIt('undo', 'all arrived'); save(); render(); toast('Undone'); });
+  });
+}
+
+/* ---------- jobs + menu ---------- */
+function openNewJob() {
+  sheet(`<h3>New job</h3><label class="fld"><span>Job name</span><input id="nName" placeholder="e.g. American Heiress" autocomplete="off"></label><div class="stack"><button class="big" id="nGo">Start</button><button class="big sec" id="nX">Cancel</button></div>`, () => {
+    const go = () => { newJob($('#nName').value.trim() || 'New job'); ui.tab = 'truck'; closeSheet(); render(); setTimeout(openAdd, 280); };
+    $('#nGo').onclick = go; $('#nName').onkeydown = e => { if (e.key === 'Enter') go(); };
+    $('#nX').onclick = closeSheet; setTimeout(() => $('#nName').focus(), 250);
+  });
+}
+function openJobs() {
+  const js = Object.values(S.jobs).sort((a, b) => b.created - a.created);
+  sheet(`<h3>Jobs</h3><div class="card menu">${js.map(j => `<button data-id="${j.id}">${esc(j.name)}<span>${j.id === S.cur ? 'Open' : new Date(j.created).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'})}</span></button>`).join('')}</div>
+  <div class="stack" style="margin-top:12px"><button class="big" id="jNew">+ New job</button>${job() ? '<button class="big sec" id="jRen">Rename this job</button><button class="big red" id="jDel">Delete this job</button>' : ''}<button class="big sec" id="jX">Close</button></div>`, sh => {
+    sh.querySelectorAll('[data-id]').forEach(b => b.onclick = () => { S.cur = b.dataset.id; logIt('job', 'Opened ' + S.jobs[S.cur].name); save(); closeSheet(); ui.tab = 'truck'; render(); });
+    $('#jNew').onclick = openNewJob; $('#jX').onclick = closeSheet;
+    const r = $('#jRen'); if (r) r.onclick = () => sheet(`<h3>Rename job</h3><label class="fld"><span>Job name</span><input id="rn" value="${esc(job().name)}"></label><button class="big" id="rnGo">Save</button>`, () => {
+      $('#rnGo').onclick = () => { const v = $('#rn').value.trim(); if (v) { logIt('job', `Renamed job to ${v}`); job().name = v; save(); } closeSheet(); render(); };
+    });
+    const d = $('#jDel'); if (d) d.onclick = () => askConfirm('Delete ' + job().name + '?', 'Everything on this job is removed from this phone. This can’t be undone.', 'Delete job', () => {
+      logIt('job', 'Deleted job ' + job().name); delete S.jobs[S.cur]; const rest = Object.keys(S.jobs); S.cur = rest[0] || null; save(); render();
+    }, true);
+  });
+}
+function openMenu() {
+  sheet(`<h3>Menu</h3><div class="card menu">
+    <button id="mJobs">Jobs<span>${Object.keys(S.jobs).length}</span></button>
+    ${job() ? '<button id="mAdd">Add to the list<span>Paste or type</span></button>' : ''}
+    <button id="mName">Your name<span>${esc(S.driver || 'Not set')}</span></button>
+    <button id="mDiag">Report a problem<span>Sends the log to Jack</span></button>
+  </div><div class="ver">CrewKit Consumables v${VERSION}${storageOk ? '' : ' · not saving on this phone'}</div>`, () => {
+    $('#mJobs').onclick = openJobs;
+    const a = $('#mAdd'); if (a) a.onclick = openAdd;
+    $('#mName').onclick = () => sheet(`<h3>Your name</h3><p>Goes at the bottom of the orders you send.</p><label class="fld"><span>Name</span><input id="dn" value="${esc(S.driver || '')}"></label><button class="big" id="dnGo">Save</button>`, () => {
+      $('#dnGo').onclick = () => { S.driver = $('#dn').value.trim(); save(); closeSheet(); toast('Saved'); };
+    });
+    $('#mDiag').onclick = openDiag;
+  });
+}
+
+/* ---------- report a problem ---------- */
+function diagText(note) {
+  const j = job(), L = [];
+  L.push('CREWKIT CONSUMABLES REPORT', 'Version: ' + VERSION, 'Sent: ' + new Date().toString(), 'Device: ' + navigator.userAgent,
+    `Screen: ${screen.width}x${screen.height} @${devicePixelRatio} · window ${innerWidth}x${innerHeight}`,
+    'Saving: ' + (storageOk ? 'yes' : 'NO') + ' · data ' + Math.round(JSON.stringify(S).length / 1024) + 'KB',
+    'Running: ' + (window.top !== window ? 'inside Claude' : standalone ? 'Home Screen app' : 'browser') + ' \u00b7 ' + location.host, '',
+    'WHAT HAPPENED:', note || '(nothing typed)', '');
+  if (j) {
+    const st = stats(j);
+    L.push('JOB: ' + j.name + ` (${live(j).length} items)`, 'list | name | delivered | truck | used | to order | on order');
+    for (const i of live(j)) { const s = st[i.id]; L.push(`${i.cat} | ${i.name} | ${s.deliver} | ${s.truck} | ${s.use} | ${s.toOrder} | ${s.pending}`); }
+    const ch = j.ev.filter(e => e.type === 'rename' || e.type === 'move');
+    if (ch.length) { L.push('', 'NAME AND LIST CHANGES:'); for (const e of ch) { const it = j.items.find(x => x.id === e.item); L.push(e.type === 'rename' ? `rename "${e.from}" -> "${e.to}"` : `move "${it ? it.name : '?'}" ${e.from} -> ${e.to}`); } }
+  }
+  L.push('', 'LOG (newest last):');
+  for (const [t, k, m] of S.log.slice(-300)) L.push(`${t.slice(5, 19).replace('T', ' ')} ${k}: ${m}`);
+  if (j) L.push('', '---DATA---', JSON.stringify({v: VERSION, job: j}));
+  return L.join('\n');
+}
+function openDiag() {
+  const canShare = !!navigator.share && window.top === window;
+  sheet(`<h3>Report a problem</h3><p>Say what went wrong or what would help. This sends the app's log and the job's list so it can be fixed. Nothing else on the phone is included.</p>
+    <label class="fld"><span>What happened?</span><textarea id="dNote" placeholder="e.g. Swiped Full CTO but it didn't go on the order"></textarea></label>
+    <div class="stack">${canShare ? '<button class="big" id="dShare">Share…</button>' : ''}<button class="big ${canShare ? 'sec' : ''}" id="dCopy">Copy report</button><button class="big sec" id="dX">Cancel</button></div>`, () => {
+    const sh = $('#dShare');
+    const txt = () => { const n = $('#dNote').value.trim(); logIt('report', n.slice(0, 120) || 'sent'); save(); return diagText(n); };
+    if (sh) sh.onclick = async () => {
+      const t = txt();
+      try {
+        const f = new File([t], `consumables-report-${new Date().toISOString().slice(0, 10)}.txt`, {type: 'text/plain'});
+        if (navigator.canShare && navigator.canShare({files: [f]})) await navigator.share({files: [f], title: 'CrewKit Consumables report'});
+        else await navigator.share({text: t});
+        closeSheet(); toast('Report sent · thanks');
+      } catch (e) { if (e && e.name === 'AbortError') return; toast('Sharing didn’t work. Use Copy.'); }
+    };
+    $('#dCopy').onclick = async () => { if (await copyText(txt())) { closeSheet(); toast('Copied · paste it in a message to Jack'); } else toast('Couldn’t copy on this phone'); };
+    $('#dX').onclick = closeSheet;
+  });
+}
+
+/* ---------- toast ---------- */
+let tT = null;
+function toast(msg, undo) {
+  const t = $('#toast');
+  t.innerHTML = `<span>${esc(msg)}</span>` + (undo ? '<button>Undo</button>' : '');
+  t.classList.toggle('plain', !undo);
+  if (undo) t.querySelector('button').onclick = () => { hideToast(); undo(); };
+  t.classList.add('show'); clearTimeout(tT); tT = setTimeout(hideToast, undo ? 5000 : 2200);
+}
+function hideToast() { $('#toast').classList.remove('show'); }
+
+/* ---------- wiring ---------- */
+$('#seg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { ui.cat = b.dataset.c; render(); scrollTo(0, 0); } });
+$('#find').addEventListener('input', e => { ui.q = e.target.value; render(); });
+$('#tTruck').onclick = () => { ui.tab = 'truck'; render(); scrollTo(0, 0); };
+$('#tOrder').onclick = () => { if (!job()) return; ui.tab = 'order'; render(); scrollTo(0, 0); };
+$('#fab').onclick = openAdd;
+$('#menuBtn').onclick = openMenu;
+$('#jobBtn').onclick = () => job() ? openJobs() : openNewJob();
+
+logIt('open', 'v' + VERSION);
+save(); render();
+if (location.protocol === 'https:' && window.top === window && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
